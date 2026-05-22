@@ -50,7 +50,7 @@ browse ready --eval <js> [--iso-eval <js>] [--session x]
     → 在当前页面执行 JS → status: "ready"
 ```
 
-浏览器状态：**ready**（空闲，页面已加载） | **loading**（导航中） | **unknown**（冻结/崩溃）
+浏览器状态：**ready**（空闲，页面已加载） | **open**（`browse status`：CDP 连接正常） | **frozen**（`browse status`：进程无响应） | **closed**（`browse status`：无活跃会话）
 
 ### 参数分布
 
@@ -71,7 +71,7 @@ browse ready --eval <js> [--iso-eval <js>] [--session x]
 | `--with-head` | — | ✅ | — | — | 显示浏览器窗口 |
 | `--url` | — | ✅ | — | — | 直接打开 URL（Target.createTarget，绕过 CDP navigate） |
 | `--ntrace` | ✅ | — | ✅ | ✅ | 导航时网络追踪 |
-| `--ntrace-first` | ✅ | — | ✅ | ✅ | 提取首个匹配的请求+响应+body（配合 --ntrace） |
+| `--ntrace-first` | ✅ | — | ✅ | ✅ | 输出首个匹配的 ID 配对请求+响应+body（与 --ntrace 互斥） |
 | `--wait` | ✅ | — | ✅ | — | 导航等待控制 |
 | `--debug` | ✅ | ✅ | ✅ | — | Console 捕获 + init 错误监控（Runtime.enable） |
 | `--session` | — | ✅ | ✅ | ✅ | 会话名称 |
@@ -101,8 +101,8 @@ browse https://example.com --profile windows-gamer
     status:      string,           # "success"（灾难性故障才非 success）
     url:         string,           # 请求的 URL
     message:     record,           # {pre, post, console} 始终存在
-    network:     list<record>,     # 始终存在，无 --ntrace 时为 []
-    idle_reason: record,           # {type: "skipped"|"normal"|"timeout"|"binding"|"deadline", reason?}
+    network:     list<record>,     # 始终存在，无 --ntrace/--ntrace-first 时为 []
+    idle_reason: record,           # {type: "skipped"|"normal"|"timeout"|"binding"|"deadline", reason}（reason 始终存在，非 binding 时为 ""）
 }
 ```
 
@@ -146,10 +146,10 @@ browse https://example.com --profile windows-gamer
 
 ```nu
 # 请求：
-{type: "request", method: string, url: string, headers: record}
+{id: string, type: "request", method: string, url: string, headers: record}
 
-# 响应：
-{type: "response", id: string, status: int, url: string, mime: string, headers: record, body: any}
+# 响应（body 仅在获取成功时存在）：
+{id: string, type: "response", status: int, url: string, mime: string, headers: record, body?: string}
 ```
 
 ### `idle_reason`
@@ -187,7 +187,7 @@ browse open --session grok --with-head --init-js ./browse-sdk.min.js --url https
 **返回 record：**
 
 ```nu
-{session: string, status: "ready", url: "https://example.com" | <target_url>, message?: record}
+{session: string, status: "ready", url: "https://example.com" | <target_url>, message: record}
 ```
 
 当使用 `--url` + init scripts 时，包含 `message`（SDK 服务的 done 信号 + 状态数据）。
@@ -214,8 +214,8 @@ browse goto https://example.com --debug --wait 10sec
     status:      string,           # "ready"（错误查看 message.*.errors）
     url:         string,           # 导航的 URL
     message:     record,           # {pre, post, console}（始终存在）
-    network:     list<record>,     # 始终存在，无 --ntrace 时为 []
-    idle_reason: record,           # {type, reason?}
+    network:     list<record>,     # 始终存在，无 --ntrace/--ntrace-first 时为 []
+    idle_reason: record,           # {type, reason}（reason 始终存在）
 }
 ```
 
@@ -247,7 +247,7 @@ browse ready --eval "document.title" --iso-eval "1+1" --session grok
         post: { output: any|null, errors: list<record> },
         console: list<string>,               # [] （ready 不导航，无 console 捕获）
     },
-    network:  list<record>,        # 始终存在，无 --ntrace 时为 []
+    network:  list<record>,        # 始终存在，无 --ntrace/--ntrace-first 时为 []
 }
 ```
 
@@ -329,7 +329,7 @@ browse close --all        # 所有会话
 
 ## `browse state` — 列出所有会话
 
-扫描所有 `.nu_browse_profile*` 目录，逐个通过 CDP 连接检查状态。
+扫描 `$HOME/.nu_browse/profiles/` 下所有会话目录，逐个通过 CDP 连接检查状态。
 
 **参数：** 无
 
@@ -400,7 +400,7 @@ Init 脚本在页面脚本执行前注入 JavaScript（CDP `Page.addScriptToEval
 | Flag | 世界 | 访问范围 | Stealth | 机制 |
 |------|------|---------|---------|------|
 | `--eval` | 主世界 | 页面全局变量、框架状态 | 可被页面脚本检测 | `raw_page.evaluate` |
-| `--iso-eval` | 隔离世界 | 仅 DOM（通过 `grantUniversalAccess`） | 安全 | `chaser.evaluate` |
+| `--iso-eval` | 隔离世界 | 仅 DOM（通过 `grantUniversalAccess`） | 安全 | `CreateIsolatedWorld` + `Evaluate` |
 
 返回值自动解析：JSON → Nushell 类型。错误进入 `message.post.errors`，不会抛出异常。
 
@@ -419,7 +419,7 @@ browse ready --iso-eval ./extract-links.js
 
 ## `--ntrace <pattern>` — 网络追踪
 
-追踪网络请求和响应，启用网络空闲等待（最多 10s）。请求和响应的 URL 都用同一个 pattern 匹配。
+追踪网络请求和响应，启用网络空闲等待（最多 10s）。请求和响应的 URL 都用同一个 pattern 匹配。双方向追踪（如 `".*"`）时自动按 CDP `requestId` 配对，仅输出配对成功的条目；单方向追踪（如 `"response"`）直接输出所有匹配条目。
 
 | Pattern | 收集请求 | 收集响应 | URL 过滤 |
 |---------|---------|---------|----------|
@@ -435,7 +435,7 @@ browse https://example.com --ntrace 'response:json'
 browse https://example.com --ntrace 'request:api\.example\.com'
 ```
 
-**`--ntrace-first`：** 配合 `--ntrace` 使用，将首个匹配的请求和响应提取到 `message.pre.output`，返回 record `{request: {...}, response: {...}, body: ...}`。`body` 尝试 JSON 解析为结构化数据。优先级低于 binding 数据。
+**`--ntrace-first`：** 与 `--ntrace` 互斥。自动启用网络追踪（默认捕获请求+响应），`network` 字段仅输出首个 ID 配对（request + response + body）。通过 CDP `requestId` 配对请求和响应。`body` 尝试 JSON 解析为结构化数据。
 
 ---
 
@@ -496,6 +496,7 @@ JS 层面的错误全部放在 `message.*.errors` 中，`status` 仅在灾难性
 | 非法会话名 | 抛出 `LabeledError` | `--session "bad.name"` |
 | ready 无 --eval/--iso-eval | 抛出 `LabeledError` | 单独的 `browse ready` |
 | close 同时指定 --all + session 名 | 抛出 `LabeledError` | `browse close grok --all` |
+| --ntrace + --ntrace-first 同时指定 | 抛出 `LabeledError`（互斥） | `browse URL --ntrace '.*' --ntrace-first` |
 
 ### 错误记录结构
 
@@ -540,47 +541,26 @@ cat /tmp/browse.log
 
 ---
 
-## SDK
-
-浏览器端 TypeScript SDK，通过 CDP `addScriptToEvaluateOnNewDocument` 注入。提供 DOM 查询、HTTP 拦截、跨世界通信、持久存储和服务集成（Grok、Twitter/X、Google）。
-
-### 构建
-
-```bash
-cd sdk && bun install
-bun run build      # 生成 IIFE bundle → 各 skill 目录
-bun x tsc --noEmit # 类型检查
-bun test           # 单元测试
-```
-
-### Bundle
-
-| Bundle | 内容 | 用途 |
-|--------|------|------|
-| `browse-sdk.min.js` | runtime（dom + http + channel + storage） | 轻量 DOM 操作 |
-| `grok.min.js` | runtime + grok 服务 | Grok 对话 |
-| `twitter.min.js` | runtime + twitter 服务 | Twitter/X API |
-| `google.min.js` | runtime + google 服务 | Google 搜索提取 |
-
-每个 bundle 是独立自包含 IIFE，对应 Nu skill 脚本放在同一目录。
-
----
-
 ## 测试
 
 ```bash
 cargo build --release
 
 # 快速测试（无浏览器，<1s）
+# MCP 方式（推荐）：单条 evaluate 执行
+cd D:\opensource\nu_plugin_browse; plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_fast.nu
+
+# nu -c fallback：
 nu -c 'plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_fast.nu'
 
-# 全部测试（99 项：fast 19 + slow 80）
-nu -c 'plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_error.nu; source tests/test_fast.nu; source tests/test_basic.nu; source tests/test_js_worlds.nu; source tests/test_persistent.nu; source tests/test_network.nu; source tests/test_stealth.nu'
+# 全部测试（100 项：fast 16 + slow 84）
+# MCP 方式逐个执行，或 fallback：
+nu -c 'plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_error.nu; source tests/test_basic.nu; source tests/test_js_worlds.nu; source tests/test_persistent.nu; source tests/test_network.nu; source tests/test_stealth.nu'
 ```
 
 | 测试文件 | 数量 | 速度 | 覆盖 |
 |----------|------|------|------|
-| `test_fast.nu` | 7 | fast | 参数验证 |
+| `test_fast.nu` | 8 | fast | 参数验证 |
 | `test_error.nu` | 12 | fast | 错误路径边界 |
 | `test_basic.nu` | 18 | slow | 导航、eval、init script、profile |
 | `test_js_worlds.nu` | 22 | slow | 跨世界隔离、binding 协议、console |
