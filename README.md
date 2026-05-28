@@ -46,8 +46,8 @@ browse open [--session x] [--with-head] [--no-stealth] [--profile p] [--url <tar
     → --init-js/--init-code 注册 init 脚本（CDP 稳定注入，跨导航持久）
 browse goto <url> [--ntrace ...] [--wait ...] [--no-stealth] [--debug]
     → 导航（init 脚本从 session 自动加载） → status: "ready"
-browse ready --eval <js> [--iso-eval <js>] [--session x]
-    → 在当前页面执行 JS → status: "ready"
+browse ready --eval <js> [--iso-eval <js>] [--session x] [--debug] [--e-timeout <duration>]
+    → 在当前页面执行 JS → status: "ready" | "timeout"
 ```
 
 浏览器状态：**ready**（空闲，页面已加载） | **open**（`browse status`：CDP 连接正常） | **frozen**（`browse status`：进程无响应） | **closed**（`browse status`：无活跃会话）
@@ -73,7 +73,8 @@ browse ready --eval <js> [--iso-eval <js>] [--session x]
 | `--ntrace` | ✅ | — | ✅ | ✅ | 导航时网络追踪 |
 | `--ntrace-first` | ✅ | — | ✅ | ✅ | 输出首个匹配的 ID 配对请求+响应+body（与 --ntrace 互斥） |
 | `--wait` | ✅ | — | ✅ | — | 导航等待控制 |
-| `--debug` | ✅ | ✅ | ✅ | — | Console 捕获 + init 错误监控（Runtime.enable） |
+| `--debug` | ✅ | ✅ | ✅ | ✅ | Console 捕获 + init 错误监控（Runtime.enable） |
+| `--e-timeout` | — | — | — | ✅ | Eval 超时（默认 15s，超时 → status "timeout"） |
 | `--session` | — | ✅ | ✅ | ✅ | 会话名称 |
 
 ---
@@ -225,7 +226,7 @@ browse goto https://example.com --debug --wait 10sec
 
 在已打开会话的当前页面上执行 JavaScript，不导航。
 
-**参数：** `--eval`、`--iso-eval`、`--session`/`-s`、`--ntrace`、`--ntrace-first`
+**参数：** `--eval`、`--iso-eval`、`--session`/`-s`、`--ntrace`、`--ntrace-first`、`--debug`/`-d`、`--e-timeout`
 
 `--eval` 和 `--iso-eval` 可同时使用，主世界先执行。
 
@@ -233,6 +234,8 @@ browse goto https://example.com --debug --wait 10sec
 browse ready --eval "document.title"
 browse ready --iso-eval "document.querySelectorAll('a').length"
 browse ready --eval "document.title" --iso-eval "1+1" --session grok
+browse ready --eval "(console.log('debug'), 1+1)" --debug
+browse ready --eval "await fetch(url)" --e-timeout 5sec
 ```
 
 **返回 record：** 与 `browse <url>` 同构的 `message`：
@@ -240,12 +243,12 @@ browse ready --eval "document.title" --iso-eval "1+1" --session grok
 ```nu
 {
     session:  string,              # 会话名称
-    status:   string,              # "ready"（错误查看 message.post.errors）
+    status:   string,              # "ready"（错误查看 message.post.errors）| "timeout"（--e-timeout 超时）
     url:      string,              # 当前页面 URL
     message: {
         pre:  { output: null, errors: [] },  # 无 init-js 阶段，固定为空
         post: { output: any|null, errors: list<record> },
-        console: list<string>,               # [] （ready 不导航，无 console 捕获）
+        console: list<string>,               # --debug 时捕获 console.log/warn/error，否则 []
     },
     network:  list<record>,        # 始终存在，无 --ntrace/--ntrace-first 时为 []
 }
@@ -495,6 +498,7 @@ JS 层面的错误全部放在 `message.*.errors` 中，`status` 仅在灾难性
 | 会话未打开 | 抛出 `LabeledError` | 已关闭 session 上 `browse goto` |
 | 非法会话名 | 抛出 `LabeledError` | `--session "bad.name"` |
 | ready 无 --eval/--iso-eval | 抛出 `LabeledError` | 单独的 `browse ready` |
+| ready --e-timeout 超时 | `status: "timeout"` + `message.post.errors` | `browse ready --eval ... --e-timeout 1sec` |
 | close 同时指定 --all + session 名 | 抛出 `LabeledError` | `browse close grok --all` |
 | --ntrace + --ntrace-first 同时指定 | 抛出 `LabeledError`（互斥） | `browse URL --ntrace '.*' --ntrace-first` |
 
