@@ -1,6 +1,6 @@
 # nu_plugin_browse
 
-Nushell headless 浏览器插件，基于 [chaser-oxide](https://github.com/0xchasercat/chaser-oxide)（CDP 协议），需要系统安装 Chrome、Chromium 或 Edge。
+Nushell headless 浏览器插件，基于 [chaser-oxide](https://github.com/ccheshirecat/chaser-oxide)（CDP 协议），需要系统安装 Chrome、Chromium 或 Edge。
 
 ## 浏览器检测
 
@@ -41,12 +41,12 @@ plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use bro
 ### 三阶段模型（持久会话）
 
 ```
-browse open [--session x] [--with-head] [--no-stealth] [--profile p] [--url <target>] [--init-js <file>] [--init-code <js>] [--iso-init-js <file>] [--iso-init-code <js>] [--debug]
+browse open [--session x] [--headed] [--no-stealth] [--profile p] [--url <target>] [--init-script <file>] [--init-content <js>] [--isolated-init-script <file>] [--isolated-init-content <js>] [--debug]
     → 启动浏览器。--url 通过 browser.new_page 直接打开目标站点（绕过 CDP navigate，适用于 x.com 等阻止 CDP 导航的站点），否则预热导航到 example.com → status: "ready"
-    → --init-js/--init-code 注册 init 脚本（CDP 稳定注入，跨导航持久）
-browse goto <url> [--ntrace ...] [--wait ...] [--no-stealth] [--debug]
+    → --init-script/--init-content 注册 init 脚本（CDP 稳定注入，跨导航持久）
+browse goto <url> [--trace ...] [--timeout ...] [--no-stealth] [--debug]
     → 导航（init 脚本从 session 自动加载） → status: "ready"
-browse ready --eval <js> [--iso-eval <js>] [--session x] [--debug] [--e-timeout <duration>]
+browse ready --eval <js> [--isolated-eval <js>] [--session x] [--debug] [--eval-timeout <duration>] [--linger <duration>]
     → 在当前页面执行 JS → status: "ready" | "timeout"
 ```
 
@@ -56,25 +56,26 @@ browse ready --eval <js> [--iso-eval <js>] [--session x] [--debug] [--e-timeout 
 
 | 参数 | browse | open | goto | ready | 用途 |
 |------|--------|------|------|-------|------|
-| `--code` | ✅ | — | — | — | Init 脚本（内联 JS，主世界，一次性） |
-| `--js` | ✅ | — | — | — | Init 脚本（文件路径，主世界，一次性） |
-| `--iso-code` | ✅ | — | — | — | Init 脚本（内联 JS，隔离世界，一次性） |
-| `--iso-js` | ✅ | — | — | — | Init 脚本（文件路径，隔离世界，一次性） |
-| `--init-code` | — | ✅ | — | — | Init 脚本（内联 JS，主世界，跨导航持久） |
-| `--init-js` | — | ✅ | — | — | Init 脚本（文件路径，主世界，跨导航持久） |
-| `--iso-init-code` | — | ✅ | — | — | Init 脚本（内联 JS，隔离世界，跨导航持久） |
-| `--iso-init-js` | — | ✅ | — | — | Init 脚本（文件路径，隔离世界，跨导航持久） |
+| `--init-content` | ✅ | — | — | — | Init 脚本（内联 JS，主世界，一次性） |
+| `--init-script` | ✅ | — | — | — | Init 脚本（文件路径，主世界，一次性） |
+| `--isolated-init-content` | ✅ | — | — | — | Init 脚本（内联 JS，隔离世界，一次性） |
+| `--isolated-init-script` | ✅ | — | — | — | Init 脚本（文件路径，隔离世界，一次性） |
+| `--init-content` | — | ✅ | — | — | Init 脚本（内联 JS，主世界，跨导航持久） |
+| `--init-script` | — | ✅ | — | — | Init 脚本（文件路径，主世界，跨导航持久） |
+| `--isolated-init-content` | — | ✅ | — | — | Init 脚本（内联 JS，隔离世界，跨导航持久） |
+| `--isolated-init-script` | — | ✅ | — | — | Init 脚本（文件路径，隔离世界，跨导航持久） |
 | `--eval` | ✅ | — | — | ✅ | 页面加载后执行 JS（主世界） |
-| `--iso-eval` | ✅ | — | — | ✅ | 页面加载后执行 JS（隔离世界） |
+| `--isolated-eval` | ✅ | — | — | ✅ | 页面加载后执行 JS（隔离世界） |
 | `--profile` | ✅ | ✅ | 继承 | — | 浏览器指纹，启动时设定 |
 | `--no-stealth` | ✅ | ✅ | ✅ | — | 禁用 Stealth 模式（默认启用） |
-| `--with-head` | — | ✅ | — | — | 显示浏览器窗口 |
-| `--url` | — | ✅ | — | — | 直接打开 URL（Target.createTarget，绕过 CDP navigate） |
-| `--ntrace` | ✅ | — | ✅ | ✅ | 导航时网络追踪 |
-| `--ntrace-first` | ✅ | — | ✅ | ✅ | 输出首个匹配的 ID 配对请求+响应+body（与 --ntrace 互斥） |
-| `--wait` | ✅ | — | ✅ | — | 导航等待控制 |
+| `--headed` | — | ✅ | — | — | 显示浏览器窗口 |
+| `--url` | — | ✅ | — | — | 直接打开 URL（`browser.new_page()`，绕过 CDP navigate） |
+| `--trace` | ✅ | — | ✅ | ✅ | 导航时网络追踪 |
+| `--trace-first` | ✅ | — | ✅ | ✅ | 输出首个匹配的 ID 配对请求+响应+body（与 --trace 互斥） |
+| `--timeout` | ✅ | — | ✅ | — | 导航等待控制 |
 | `--debug` | ✅ | ✅ | ✅ | ✅ | Console 捕获 + init 错误监控（Runtime.enable） |
-| `--e-timeout` | — | — | — | ✅ | Eval 超时（默认 15s，超时 → status "timeout"） |
+| `--eval-timeout` | — | — | — | ✅ | Eval 超时（默认 15s，超时 → status "timeout"） |
+| `--linger` | — | — | — | ✅ | --trace 收尾监听时间（默认 --eval-timeout） |
 | `--session` | — | ✅ | ✅ | ✅ | 会话名称 |
 
 ---
@@ -83,15 +84,15 @@ browse ready --eval <js> [--iso-eval <js>] [--session x] [--debug] [--e-timeout 
 
 启动临时浏览器，请求完成后自动关闭。
 
-**参数：** `<url>`（必填）、`--code`、`--js`、`--iso-code`、`--iso-js`、`--eval`/`-e`、`--iso-eval`、`--ntrace`、`--ntrace-first`、`--wait`/`-w`、`--profile`、`--no-stealth`、`--debug`
+**参数：** `<url>`（必填）、`--init-content`、`--init-script`、`--isolated-init-content`、`--isolated-init-script`、`--eval`/`-e`、`--isolated-eval`、`--trace`、`--trace-first`（与 `--trace` 互斥）、`--timeout`/`-t`、`--profile`、`--no-stealth`、`--debug`
 
 ```nu
 browse https://example.com
 browse https://example.com --eval "document.title"
-browse https://example.com --code "window.__x = 1;" --eval "window.__x"
-browse https://example.com --ntrace '.*'
+browse https://example.com --init-content "window.__x = 1;" --eval "window.__x"
+browse https://example.com --trace '.*'
 browse https://example.com --profile windows-gamer
-# 管道输入 → 自动作为 --iso-eval 执行
+# 管道输入 → 自动作为 --isolated-eval 执行
 "document.title" | browse https://example.com
 ```
 
@@ -99,31 +100,33 @@ browse https://example.com --profile windows-gamer
 
 ```nu
 {
-    status:      string,           # "success"（灾难性故障才非 success）
-    url:         string,           # 请求的 URL
-    message:     record,           # {pre, post, console} 始终存在
-    network:     list<record>,     # 始终存在，无 --ntrace/--ntrace-first 时为 []
-    idle_reason: record,           # {type: "skipped"|"normal"|"timeout"|"binding"|"deadline", reason}（reason 始终存在，非 binding 时为 ""）
+    status:   string,              # "success"（灾难性故障才非 success）
+    url:      string,              # 请求的 URL
+    session:  string,              # ephemeral 时为 ""
+    duration: int,                 # 执行耗时（ms），始终存在
+    idle:     string,              # "skipped"|"network-idle"|"timeout"|"binding"|"deadline"|""
+    errors:   list<record>,        # init + eval 错误合并，无则 []
+    console:  list<string>,        # console.log/warn/error 捕获输出（无 --debug 时为 []）
+    binding:  any,                 # done 协议 data 字段（结构化 Nu Value），无则 null
+    result:   any,                 # --eval/--isolated-eval 返回值（结构化 Nu Value），无则 null
+    network:  list<record>,        # 始终存在，无 --trace/--trace-first 时为 []
 }
 ```
 
-### `message` 结构（browse / goto / ready 统一）
+`binding` 和 `result` 的类型是「JSON 可表示的 Nu Value」（七变体之一），由 `json_value_to_nu` 从 CDP 返回的 JSON 直接构造。**不需要 `from json`**。不会出现 `duration` / `range` / `closure` / `binary` / `cell-path` 等 Nu 特有类型 —— JS 侧产不出。
 
-所有 key 始终存在，`output` 无值时是 `Nothing`（null），`errors` 无错误时是 `[]`，`console` 始终为 `list<string>`：
+### 扁平契约（browse / open / goto / ready 统一）
 
-```nu
-{
-    pre: {                         # Init 脚本（--code/--js）结果
-        output: any|null,          # binding data（JSON→Nu 类型）或 Nothing
-        errors: list<record>,      # [] 无错误
-    },
-    post: {                        # Eval（--eval/--iso-eval）结果
-        output: any|null,          # eval 返回值或 Nothing
-        errors: list<record>,      # [] 无错误
-    },
-    console: list<string>,         # console.log/warn/error 捕获输出
-}
-```
+所有 key 始终存在并使用 sentinel 默认值（详见 `src/output.rs::build_output`）：
+
+| Sentinel | 含义 |
+|----------|------|
+| `null`（Nothing） | "无值" — `binding` / `result` |
+| `[]`（空列表） | "什么都没发生" — `errors` / `console` / `network` |
+| `""`（空串） | "空内容" — `url` / `session` / `idle` |
+
+- `binding`（done 协议数据）和 `result`（eval 返回值）都是结构化 Nu Value，**不需要 `from json`**
+- `errors` 合并 init 错误（在前）与 eval 错误（在后），每条为 `{message, kind, line?, column?}`
 
 ### `console` 捕获（`--debug`）
 
@@ -131,9 +134,9 @@ browse https://example.com --profile windows-gamer
 
 格式为 `[Log] message`。
 
-- **有 `--debug` 时：** `console` 包含捕获的条目；`message.pre.errors` 包含 init 脚本异常；无输出时为 `[]`
+- **有 `--debug` 时：** `console` 包含捕获的条目；`errors` 包含 init 脚本异常；无输出时为 `[]`
 - **无 `--debug` 时：** `console` 始终为 `[]`，init 脚本异常不被捕获（最大隐蔽性）
-- 固定 key 契约：`message.console` **始终存在**，不会缺失
+- 固定 key 契约：`console` **始终存在**，不会缺失
 
 ### 错误记录结构
 
@@ -146,22 +149,31 @@ browse https://example.com --profile windows-gamer
 ### `network` 条目
 
 ```nu
-# 请求：
-{id: string, type: "request", method: string, url: string, headers: record}
+# 请求（body 仅 POST 数据可解码为 UTF-8 时存在）：
+{id: string, type: "request", method: string, url: string, headers: record, body?: string}
 
 # 响应（body 仅在获取成功时存在）：
 {id: string, type: "response", status: int, url: string, mime: string, headers: record, body?: string}
 ```
 
-### `idle_reason`
+- `id` — CDP `requestId`，请求与响应共享，可精确配对
+- `headers` — Nu record（非 JSON 字符串），直接访问字段如 `$entry.headers.host`
+- `body` — 可选字段：
+  - **request**：取自 CDP `postDataEntries` 第一项 `bytes`（base64 解码 → UTF-8 字符串）。仅可解码为 UTF-8 时记录；二进制上传体或解码失败时 `body` 字段不出现。
+  - **response**：取自 CDP `GetResponseBody`（字符串）
 
-| type | 含义 |
+### `idle` 字段
+
+扁平字符串（非嵌套 record）。
+
+| 值 | 含义 |
 |------|------|
-| `"skipped"` | 无等待 / 仅固定 `--wait` |
-| `"normal"` | 网络空闲确认（`--ntrace`） |
-| `"timeout"` | 网络空闲超时（10s，`--ntrace`） |
+| `"skipped"` | 无等待 / 仅固定 `--timeout` |
+| `"network-idle"` | 网络空闲确认（`--trace`） |
+| `"timeout"` | 网络空闲超时（10s，`--trace`） |
 | `"binding"` | Init 脚本通过 `__browse_done()` 提前终止等待 |
-| `"deadline"` | `--wait` 全局截止时间到期 |
+| `"deadline"` | `--timeout` 全局截止时间到期 |
+| `""` | 不适用（如 `browse ready`） |
 
 ---
 
@@ -173,52 +185,35 @@ browse https://example.com --profile windows-gamer
 
 如果同名 session 已存在，会先关闭旧浏览器进程再重新启动。
 
-**参数：** `--session`/`-s`、`--with-head`、`--no-stealth`、`--profile`、`--url`、`--init-js`、`--init-code`、`--iso-init-js`、`--iso-init-code`、`--debug`
+**参数：** `--session`/`-s`、`--headed`、`--no-stealth`、`--profile`、`--url`、`--init-script`、`--init-content`、`--isolated-init-script`、`--isolated-init-content`、`--debug`
 
 ```nu
 browse open                                    # 默认会话，预热到 example.com
 browse open --session grok                     # 命名会话
-browse open --session grok --with-head          # 显示浏览器窗口
+browse open --session grok --headed          # 显示浏览器窗口
 browse open --profile windows-gamer             # 指纹预设
 browse open --url https://x.com/home            # 直接打开目标 URL
-browse open --session twitter --with-head --url https://x.com/home
-browse open --session grok --with-head --init-js ./browse-sdk.min.js --url https://grok.com
+browse open --session twitter --headed --url https://x.com/home
+browse open --session grok --headed --init-script ./browse-sdk.min.js --url https://grok.com
 ```
 
-**返回 record：**
-
-```nu
-{session: string, status: "ready", url: "https://example.com" | <target_url>, message: record}
-```
-
-当使用 `--url` + init scripts 时，包含 `message`（SDK 服务的 done 信号 + 状态数据）。
+**返回扁平 record：** 与 `browse <url>` 同构（`status: "ready"`，`binding` 携带 SDK done 信号 + 状态数据）。当使用 `--url` + init scripts 时，SDK 服务调用 `__browse_done({data})` 后 `binding` 包含其数据。
 
 ---
 
 ## `browse goto <url>` — 导航 + 注入
 
-连接已有会话，导航到新 URL。Init 脚本从 session 文件自动加载（通过 `browse open --init-js/--init-code` 注册）。
+连接已有会话，导航到新 URL。Init 脚本从 session 文件自动加载（通过 `browse open --init-script/--init-content` 注册）。
 
-**参数：** `<url>`（必填）、`--session`/`-s`、`--ntrace`、`--ntrace-first`、`--wait`/`-w`、`--no-stealth`、`--debug`
+**参数：** `<url>`（必填）、`--session`/`-s`、`--trace`、`--trace-first`（与 `--trace` 互斥）、`--timeout`/`-t`、`--no-stealth`、`--debug`
 
 ```nu
 browse goto https://example.com
-browse goto https://example.com --ntrace 'response:api\.'
-browse goto https://example.com --debug --wait 10sec
+browse goto https://example.com --trace 'response:api\.'
+browse goto https://example.com --debug --timeout 10sec
 ```
 
-**返回 record：** 字段与 `browse <url>` 相同，外加 `session`：
-
-```nu
-{
-    session:     string,           # 会话名称
-    status:      string,           # "ready"（错误查看 message.*.errors）
-    url:         string,           # 导航的 URL
-    message:     record,           # {pre, post, console}（始终存在）
-    network:     list<record>,     # 始终存在，无 --ntrace/--ntrace-first 时为 []
-    idle_reason: record,           # {type, reason}（reason 始终存在）
-}
-```
+**返回扁平 record：** 字段与 `browse <url>` 相同（`session` 为会话名，错误查看 `errors`，eval 返回值在 `result`，done 数据在 `binding`，`idle` 为字符串 idle 原因）。
 
 ---
 
@@ -226,35 +221,38 @@ browse goto https://example.com --debug --wait 10sec
 
 在已打开会话的当前页面上执行 JavaScript，不导航。
 
-**参数：** `--eval`、`--iso-eval`、`--session`/`-s`、`--ntrace`、`--ntrace-first`、`--debug`/`-d`、`--e-timeout`
+**参数：** `--eval`、`--isolated-eval`、`--session`/`-s`、`--trace`、`--trace-first`、`--debug`/`-d`、`--eval-timeout`、`--linger`
 
-`--eval` 和 `--iso-eval` 可同时使用，主世界先执行。
+`--eval` 和 `--isolated-eval` 可同时使用，主世界先执行。
+
+`--eval-timeout` 是 eval 执行截止时间（默认 15s）。`--linger`（默认等于 `--eval-timeout`）控制 `--trace` 模式下 eval 返回后继续监听网络的时长，用于捕获 `setTimeout` 触发的异步请求。两者独立：有 `--trace` 时总超时 = `eval-timeout + linger + 2s`，无 `--trace` 时 = `eval-timeout`。
 
 ```nu
 browse ready --eval "document.title"
-browse ready --iso-eval "document.querySelectorAll('a').length"
-browse ready --eval "document.title" --iso-eval "1+1" --session grok
+browse ready --isolated-eval "document.querySelectorAll('a').length"
+browse ready --eval "document.title" --isolated-eval "1+1" --session grok
 browse ready --eval "(console.log('debug'), 1+1)" --debug
-browse ready --eval "await fetch(url)" --e-timeout 5sec
+browse ready --eval "await fetch(url)" --eval-timeout 5sec
 ```
 
-**返回 record：** 与 `browse <url>` 同构的 `message`：
+**返回扁平 record：** 与 `browse <url>` 同构：
 
 ```nu
 {
     session:  string,              # 会话名称
-    status:   string,              # "ready"（错误查看 message.post.errors）| "timeout"（--e-timeout 超时）
+    status:   string,              # "ready"（错误查看 errors）| "timeout"（--eval-timeout 超时）
     url:      string,              # 当前页面 URL
-    message: {
-        pre:  { output: null, errors: [] },  # 无 init-js 阶段，固定为空
-        post: { output: any|null, errors: list<record> },
-        console: list<string>,               # --debug 时捕获 console.log/warn/error，否则 []
-    },
-    network:  list<record>,        # 始终存在，无 --ntrace/--ntrace-first 时为 []
+    duration: int,                 # 执行耗时（ms）
+    idle:     string,              # browse ready 固定为 ""
+    errors:   list<record>,        # eval 错误，无则 []
+    console:  list<string>,        # --debug 时捕获 console.log/warn/error，否则 []
+    binding:  nothing,            # browse ready 固定为 null
+    result:   nothing|bool|int|float|string|list|record,  # eval 返回值（JSON→Nu），无则 null
+    network:  list<record>,        # 始终存在，无 --trace/--trace-first 时为 []
 }
 ```
 
-必须指定 `--eval` 或 `--iso-eval` 其中之一，否则抛出 LabeledError。
+必须指定 `--eval` 或 `--isolated-eval` 其中之一，否则抛出 LabeledError。
 
 ---
 
@@ -369,10 +367,10 @@ Init 脚本在页面脚本执行前注入 JavaScript（CDP `Page.addScriptToEval
 
 | Flag | 世界 | 输入 | 示例 |
 |------|------|------|------|
-| `--init-code <js>` | 主世界 | 内联 JS | `--init-code "window.__x = 1;"` |
-| `--init-js <path>` | 主世界 | 文件路径 | `--init-js ./hook.js` |
-| `--iso-init-code <js>` | 隔离世界 | 内联 JS | `--iso-init-code "var x = 1;"` |
-| `--iso-init-js <path>` | 隔离世界 | 文件路径 | `--iso-init-js ./hook.js` |
+| `--init-content <js>` | 主世界 | 内联 JS | `--init-content "window.__x = 1;"` |
+| `--init-script <path>` | 主世界 | 文件路径 | `--init-script ./hook.js` |
+| `--isolated-init-content <js>` | 隔离世界 | 内联 JS | `--isolated-init-content "var x = 1;"` |
+| `--isolated-init-script <path>` | 隔离世界 | 文件路径 | `--isolated-init-script ./hook.js` |
 
 ### 一次性模式（`browse <url>`）
 
@@ -380,10 +378,10 @@ Init 脚本在页面脚本执行前注入 JavaScript（CDP `Page.addScriptToEval
 
 | Flag | 世界 | 输入 | 示例 |
 |------|------|------|------|
-| `--code <js>` | 主世界 | 内联 JS | `--code "window.__x = 1;"` |
-| `--js <path>` | 主世界 | 文件路径 | `--js ./hook.js` |
-| `--iso-code <js>` | 隔离世界 | 内联 JS | `--iso-code "var x = 1;"` |
-| `--iso-js <path>` | 隔离世界 | 文件路径 | `--iso-js ./hook.js` |
+| `--init-content <js>` | 主世界 | 内联 JS | `--init-content "window.__x = 1;"` |
+| `--init-script <path>` | 主世界 | 文件路径 | `--init-script ./hook.js` |
+| `--isolated-init-content <js>` | 隔离世界 | 内联 JS | `--isolated-init-content "var x = 1;"` |
+| `--isolated-init-script <path>` | 隔离世界 | 文件路径 | `--isolated-init-script ./hook.js` |
 
 - CDP 稳定注入（页面导航/iframe 自动重新注入）
 - 自动注入 `window.__browse_done()` 函数，用于提前终止等待并传递数据（DOM meta tag 通道，零 `Runtime.enable`）
@@ -392,7 +390,7 @@ Init 脚本在页面脚本执行前注入 JavaScript（CDP `Page.addScriptToEval
 
 ---
 
-## `--eval` / `--iso-eval` — JS 执行
+## `--eval` / `--isolated-eval` — JS 执行
 
 页面加载后执行 JavaScript。可同时使用 — 主世界优先，然后隔离世界。
 
@@ -403,24 +401,24 @@ Init 脚本在页面脚本执行前注入 JavaScript（CDP `Page.addScriptToEval
 | Flag | 世界 | 访问范围 | Stealth | 机制 |
 |------|------|---------|---------|------|
 | `--eval` | 主世界 | 页面全局变量、框架状态 | 可被页面脚本检测 | `raw_page.evaluate` |
-| `--iso-eval` | 隔离世界 | 仅 DOM（通过 `grantUniversalAccess`） | 安全 | `CreateIsolatedWorld` + `Evaluate` |
+| `--isolated-eval` | 隔离世界 | 仅 DOM（通过 `grantUniversalAccess`） | 安全 | `CreateIsolatedWorld` + `Evaluate` |
 
-返回值自动解析：JSON → Nushell 类型。错误进入 `message.post.errors`，不会抛出异常。
+返回值自动解析：JSON → Nushell 类型。错误进入顶层 `errors` 字段，不会抛出异常。
 
 ```nu
 # 主世界 — 访问页面框架状态
 browse ready --eval "window.__NEXT_DATA__"
 
 # 隔离世界 — 访问 DOM，stealth 安全
-browse ready --iso-eval "document.querySelectorAll('a').length"
+browse ready --isolated-eval "document.querySelectorAll('a').length"
 
 # 从文件执行
-browse ready --iso-eval ./extract-links.js
+browse ready --isolated-eval ./extract-links.js
 ```
 
 ---
 
-## `--ntrace <pattern>` — 网络追踪
+## `--trace <pattern>` — 网络追踪
 
 追踪网络请求和响应，启用网络空闲等待（最多 10s）。请求和响应的 URL 都用同一个 pattern 匹配。双方向追踪（如 `".*"`）时自动按 CDP `requestId` 配对，仅输出配对成功的条目；单方向追踪（如 `"response"`）直接输出所有匹配条目。
 
@@ -433,12 +431,12 @@ browse ready --iso-eval ./extract-links.js
 | `"response:<regex>"` | — | ✅ | regex 匹配 |
 
 ```nu
-browse https://example.com --ntrace '.*'
-browse https://example.com --ntrace 'response:json'
-browse https://example.com --ntrace 'request:api\.example\.com'
+browse https://example.com --trace '.*'
+browse https://example.com --trace 'response:json'
+browse https://example.com --trace 'request:api\.example\.com'
 ```
 
-**`--ntrace-first`：** 与 `--ntrace` 互斥。自动启用网络追踪（默认捕获请求+响应），`network` 字段仅输出首个 ID 配对（request + response + body）。通过 CDP `requestId` 配对请求和响应。`body` 尝试 JSON 解析为结构化数据。
+**`--trace-first`：** 与 `--trace` 互斥。自动启用网络追踪（默认捕获请求+响应），`network` 字段仅输出首个 ID 配对（request + response + body）。通过 CDP `requestId` 配对请求和响应。`body` 尝试 JSON 解析为结构化数据。
 
 ---
 
@@ -459,48 +457,48 @@ browse https://example.com --ntrace 'request:api\.example\.com'
 
 ## 等待策略
 
-`--wait N`（默认 15s）是全局硬截止时间，从导航开始到返回的整个流程中生效。所有内部机制（binding、ntrace、goto）正常运作，但 `--wait` 作为最外层硬截止优先。`--wait` **不是 sleep** — 不传时，无 binding/ntrace 的 wait phase 直接返回 `skipped`。
+`--timeout N`（默认 15s）是全局硬截止时间，从导航开始到返回的整个流程中生效。所有内部机制（binding、ntrace、goto）正常运作，但 `--timeout` 作为最外层硬截止优先。`--timeout` **不是 sleep** — 不传时，无 binding/ntrace 的 wait phase 直接返回 `skipped`。
 
-| 参数 | 内部机制 | `idle_reason.type` |
+| 参数 | 内部机制 | `idle` |
 |------|----------|-------------------|
-| 仅 `--ntrace` | 网络空闲循环（最多 10s） | `"normal"` / `"timeout"` |
-| `--ntrace` + init scripts | 同上 + binding 捷径 | + `"binding"` |
-| 仅 init scripts | Binding 等待（上限为 `--wait` 或 15s） | `"binding"` / `"skipped"` |
-| 仅 `--wait` | 固定等待（goto 时间从 N 中扣除） | `"skipped"` |
+| 仅 `--trace` | 网络空闲循环（最多 10s） | `"network-idle"` / `"timeout"` |
+| `--trace` + init scripts | 同上 + binding 捷径 | + `"binding"` |
+| 仅 init scripts | Binding 等待（上限为 `--timeout` 或 15s） | `"binding"` / `"skipped"` |
+| 仅 `--timeout` | 固定等待（goto 时间从 N 中扣除） | `"skipped"` |
 | 无任何参数 | goto 完成后立即返回 | `"skipped"` |
-| `--wait` 到期 | 全局截止覆盖所有机制 | `"deadline"` |
+| `--timeout` 到期 | 全局截止覆盖所有机制 | `"deadline"` |
 
 ### Binding 协议（done 信号）
 
 Init 脚本可通过 `window.__browse_done()` 提前终止等待并传递数据。插件自动注入 `__browse_done` 函数，它将数据写入 DOM `<meta name="__browse_done">` 标签，Rust 端通过隔离世界轮询读取（零 `Runtime.enable`，完全隐蔽）。
 
 ```js
-// 在 --code 或 --js 文件中：
+// 在 --init-content 或 --init-script 文件中：
 setTimeout(() => {
     window.__browse_done({reason: 'scraped', data: {title: document.title}});
 }, 100);
 ```
 
-`data` 从 JSON 解析为 Nushell Value，放入 `message.pre.output`。
+`data` 从 JSON 解析为 Nushell Value，放入顶层 `binding` 字段。
 
 ---
 
 ## 错误处理
 
 `status` 字段反映的是**浏览器/连接健康状态**，不作 per-phase 错误判断。
-JS 层面的错误全部放在 `message.*.errors` 中，`status` 仅在灾难性故障时为非 `"success"`/`"ready"`。
+JS 层面的错误全部放在顶层 `errors` 字段中（init 错误在前，eval 错误在后），`status` 仅在灾难性故障时为非 `"success"`/`"ready"`。
 
 | 错误 | 处理方式 | 示例 |
 |------|----------|------|
-| Eval JS 错误 | `message.post.errors`（`status` 仍为 `"ready"`） | `ReferenceError` |
-| Init 脚本错误 | `message.pre.errors`（需 `--debug`，否则不捕获） | `SyntaxError` |
+| Eval JS 错误 | `errors`（`status` 仍为 `"ready"`） | `ReferenceError` |
+| Init 脚本错误 | `errors`（需 `--debug`，否则不捕获） | `SyntaxError` |
 | 无效 URL | 抛出 `LabeledError` | `browse baidu.com` |
 | 会话未打开 | 抛出 `LabeledError` | 已关闭 session 上 `browse goto` |
 | 非法会话名 | 抛出 `LabeledError` | `--session "bad.name"` |
-| ready 无 --eval/--iso-eval | 抛出 `LabeledError` | 单独的 `browse ready` |
-| ready --e-timeout 超时 | `status: "timeout"` + `message.post.errors` | `browse ready --eval ... --e-timeout 1sec` |
+| ready 无 --eval/--isolated-eval | 抛出 `LabeledError` | 单独的 `browse ready` |
+| ready --eval-timeout 超时 | `status: "timeout"` + `errors` | `browse ready --eval ... --eval-timeout 1sec` |
 | close 同时指定 --all + session 名 | 抛出 `LabeledError` | `browse close grok --all` |
-| --ntrace + --ntrace-first 同时指定 | 抛出 `LabeledError`（互斥） | `browse URL --ntrace '.*' --ntrace-first` |
+| --trace + --trace-first 同时指定 | 抛出 `LabeledError`（互斥） | `browse URL --trace '.*' --trace-first` |
 
 ### 错误记录结构
 
@@ -517,10 +515,10 @@ JS 层面的错误全部放在 `message.*.errors` 中，`status` 仅在灾难性
 使用示例：
 ```nu
 # 检查是否有 JS 异常
-$result.message.pre.errors | where kind == "js_exception"
+$result.errors | where kind == "js_exception"
 
 # 取第一条错误消息
-$result.message.post.errors | first | get message
+$result.errors | first | get message
 ```
 
 ---
@@ -557,19 +555,19 @@ cd D:\opensource\nu_plugin_browse; plugin rm browse; plugin add target/release/n
 # nu -c fallback：
 nu -c 'plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_fast.nu'
 
-# 全部测试（100 项：fast 16 + slow 84）
+# 全部测试（113 项 = test_fast 10 + test_error 14 + test_basic 18 + test_js_worlds 22 + test_persistent 24 + test_network 13 + test_stealth 12）
 # MCP 方式逐个执行，或 fallback：
-nu -c 'plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_error.nu; source tests/test_basic.nu; source tests/test_js_worlds.nu; source tests/test_persistent.nu; source tests/test_network.nu; source tests/test_stealth.nu'
+nu -c 'plugin rm browse; plugin add target/release/nu_plugin_browse.exe; plugin use browse; source tests/test_fast.nu; source tests/test_error.nu; source tests/test_basic.nu; source tests/test_js_worlds.nu; source tests/test_persistent.nu; source tests/test_network.nu; source tests/test_stealth.nu'
 ```
 
 | 测试文件 | 数量 | 速度 | 覆盖 |
 |----------|------|------|------|
-| `test_fast.nu` | 8 | fast | 参数验证 |
-| `test_error.nu` | 12 | fast | 错误路径边界 |
+| `test_fast.nu` | 10 | fast | 参数验证 |
+| `test_error.nu` | 14 | fast | 错误路径边界、resolve_js 启发式 |
 | `test_basic.nu` | 18 | slow | 导航、eval、init script、profile |
 | `test_js_worlds.nu` | 22 | slow | 跨世界隔离、binding 协议、console |
-| `test_persistent.nu` | 16 | slow | session 生命周期、cookie、多 session |
-| `test_network.nu` | 12 | slow | ntrace、ntrace-first、JSON body |
+| `test_persistent.nu` | 24 | slow | session 生命周期、cookie、多 session、trace linger |
+| `test_network.nu` | 13 | slow | trace、trace-first、JSON body、request body |
 | `test_stealth.nu` | 12 | slow | 反检测（bot.sannysoft.com） |
 
 支持 `$env.TEST_FROM = N` 从指定编号开始跳过前面的测试。
